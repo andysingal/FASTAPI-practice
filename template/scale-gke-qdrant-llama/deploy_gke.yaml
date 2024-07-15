@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llama-gke-deploy
+spec:
+  replicas: 2                     # Pods
+  selector:
+    matchLabels:
+      app: llama-gke-pod
+  template:
+    metadata:
+      labels:
+        app: llama-gke-pod
+    spec:
+      containers:
+      - name: llama-gke-container
+        image: gcr.io/PROJECT_ID/IMAGE:TAG
+        ports:
+        - containerPort: 8000     # Port inside the container where the FastAPI app is running
+        env:
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-secret
+              key: OPENAI_API_KEY        
+        - name: QDRANT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: qdrant-secret
+              key: QDRANT_API_KEY
+        - name: QDRANT_URL
+          valueFrom:
+            secretKeyRef:
+              name: qdrant-secret
+              key: QDRANT_URL
+        - name: COLLECTION_NAME
+          valueFrom:
+            secretKeyRef:
+              name: qdrant-secret
+              key: COLLECTION_NAME
+        resources:
+          requests:               # Minimum resources required.
+            memory: "2Gi"
+            cpu: "1"
+          limits:                 # Maximum resources allowed
+            memory: "12Gi"        # Maximum memory of the instance (80-90%)
+            cpu: "4"              # Maximum vCPUs of the instance
+        readinessProbe:           # Check if the pod is ready to serve traffic.
+          httpGet:
+            scheme: HTTP
+            path: /
+            port: 8000              # Port for readiness probe (should match containerPort)
+          initialDelaySeconds: 240  # Delay before first probe is executed
+          periodSeconds: 60         # Interval between probes
+        livenessProbe:              # Check if the pod is alive
+          httpGet:
+            scheme: HTTP
+            path: /
+            port: 8000              # Port for liveness probe (should match containerPort)
+          initialDelaySeconds: 240  # Delay before first probe is executed
+          periodSeconds: 60         # Interval between probes
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mylb
+spec:
+  type: LoadBalancer
+  selector:
+    app: llama-gke-pod
+  ports:
+  - port: 8000                    # Port exposed by the Kubernetes service (ccould be 80 as well)
+    targetPort: 8000              # Port where the service forwards traffic to (should match containerPort)
+
+# Vertical scaling
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: llama-gke-deploy-vpa
+spec:
+  targetRef:
+    apiVersion: "apps/v1"
+    kind:       Deployment
+    name:       llama-gke-deploy
+  updatePolicy:                   # Policy for updating the resource requests and limits
+    updateMode: "Auto"            # Automatically update the resource requests and limits
+
+# Horizontal scaling
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: llama-gke-deploy-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: llama-gke-deploy
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource                # Type of metric
+    resource:                     # Resource-based metric
+      name: cpu                   # Metric name
+      target:
+        type: Utilization         # Type of target value
+        averageUtilization: 70    # Average CPU utilization percentage to maintain.

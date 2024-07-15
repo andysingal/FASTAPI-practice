@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+openai
+torch
+sentence-transformers 
+PyGithub
+python-dotenv
+qdrant-client
+llama-index  
+llama-index-embeddings-openai
+llama-index-vector-stores-qdrant
+llama-index-readers-github 
+ruff
+streamlit
+pytest
