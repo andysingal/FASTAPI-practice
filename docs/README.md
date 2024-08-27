@@ -7,3 +7,5 @@
 
 UseCase:
 - [Building a Retail AI Chatbot](https://medium.datadriveninvestor.com/building-a-retail-ai-chatbot-fastapi-langchain-postgresql-and-market-basket-analysis-30f752d9f404)
+- [CodeLlamaServer](https://github.com/OzMaatuk/CodeLlamaServer/blob/master/app-llamacpp.py)
+
